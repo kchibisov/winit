@@ -38,6 +38,8 @@ And please only add new entries to the top of this list, right below the `# Unre
   sent a cancel or frame event.
 - On iOS, send `RedrawEventsCleared` even if there are no redraw events, consistent with other platforms.
 - **Breaking:** Replaced `Window::with_app_id` and `Window::with_class` with `Window::with_name` on `WindowBuilderExtUnix`.
+- Add `set_clipboard_content` and `request_clipboard_content` API on `Window`
+- Add `set_primary_clipboard_content` and `request_primary_clipboard_content` API on `WindowExtUnix`
 
 # 0.26.1 (2022-01-05)
 
