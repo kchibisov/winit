@@ -11,6 +11,7 @@ use sctk::reexports::calloop;
 use raw_window_handle::WaylandHandle;
 use sctk::window::{Decorations, FallbackFrame};
 
+use crate::clipboard::{ClipboardMimedContent, MimeType};
 use crate::dpi::{LogicalSize, PhysicalPosition, PhysicalSize, Position, Size};
 use crate::error::{ExternalError, NotSupportedError, OsError as RootOsError};
 use crate::event::ClipboardMetadata;
@@ -501,61 +502,53 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    ) {
+    pub fn set_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
         if !self.windowing_features.clipboard() {
             return;
         }
 
         let content = Rc::new(content);
         let ty = ClipboardType::Clipboard;
-        self.send_request(WindowRequest::SetClipboardContent(ty, content, mimes));
+        // self.send_request(WindowRequest::SetClipboardContent(ty, content, mimes));
     }
 
     #[inline]
-    pub fn set_primary_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    ) {
+    pub fn set_primary_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
         if !self.windowing_features.primary_clipboard() {
             return;
         }
 
         let ty = ClipboardType::Primary;
         let content = Rc::new(content);
-        self.send_request(WindowRequest::SetClipboardContent(ty, content, mimes));
+        // self.send_request(WindowRequest::SetClipboardContent(ty, content, mimes));
     }
 
     #[inline]
     pub fn request_clipboard_content(
         &self,
-        mimes: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
         if !self.windowing_features.clipboard() {
             return;
         }
 
         let ty = ClipboardType::Clipboard;
-        self.send_request(WindowRequest::RequestClipboardContent(ty, mimes, metadata));
+        // self.send_request(WindowRequest::RequestClipboardContent(ty, mimes, metadata));
     }
 
     #[inline]
     pub fn request_primary_clipboard_content(
         &self,
-        mimes: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
         if !self.windowing_features.primary_clipboard() {
             return;
         }
 
         let ty = ClipboardType::Primary;
-        self.send_request(WindowRequest::RequestClipboardContent(ty, mimes, metadata));
+        // self.send_request(WindowRequest::RequestClipboardContent(ty, mimes, metadata));
     }
 
     #[inline]

@@ -1,8 +1,10 @@
 //! The `Window` struct and associated types.
 use std::collections::HashSet;
 use std::fmt;
+use std::sync::Arc;
 
 use crate::{
+    clipboard::{ClipboardMimedContent, MimeType},
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
     error::{ExternalError, NotSupportedError, OsError},
     event::ClipboardMetadata,
@@ -1020,21 +1022,17 @@ impl Window {
     #[inline]
     pub fn request_clipboard_content(
         &self,
-        mimes: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
-        self.window.request_clipboard_content(mimes, metadata);
+        self.window.request_clipboard_content(serial, mime_picker);
     }
 
-    /// Set system clipboard content to provided `content` and advertising it with given `mimes`
+    /// TODO Set system clipboard content to provided `content` and advertising it with given `mimes`
     /// mime types.
     #[inline]
-    pub fn set_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    ) {
-        self.window.set_clipboard_content(content, mimes);
+    pub fn set_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
+        self.window.set_clipboard_content(serial, content);
     }
 }
 

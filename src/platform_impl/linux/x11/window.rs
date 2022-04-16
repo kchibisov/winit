@@ -18,6 +18,7 @@ use libc;
 use parking_lot::Mutex;
 
 use crate::{
+    clipboard::{ClipboardMimedContent, MimeType},
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
     error::{ExternalError, NotSupportedError, OsError as RootOsError},
     event::ClipboardMetadata,
@@ -1481,32 +1482,28 @@ impl UnownedWindow {
     #[inline]
     pub fn request_clipboard_content(
         &self,
-        _mimes: HashSet<String>,
-        _metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
         unimplemented!();
     }
 
     #[inline]
-    pub fn set_clipboard_content<C: AsRef<[u8]>>(&self, _content: C, _mimes: HashSet<String>) {
+    pub fn set_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
         unimplemented!();
     }
 
     #[inline]
     pub fn request_primary_clipboard_content(
         &self,
-        _mimes: HashSet<String>,
-        _metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
         unimplemented!();
     }
 
     #[inline]
-    pub fn set_primary_clipboard_content<C: AsRef<[u8]>>(
-        &self,
-        _content: C,
-        _mimes: HashSet<String>,
-    ) {
+    pub fn set_primary_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
         unimplemented!();
     }
 

@@ -25,6 +25,7 @@ pub use self::x11::XNotSupported;
 #[cfg(feature = "x11")]
 use self::x11::{ffi::XVisualInfo, util::WindowType as XWindowType, XConnection, XError};
 use crate::{
+    clipboard::{ClipboardMimedContent, MimeType},
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
     error::{ExternalError, NotSupportedError, OsError as RootOsError},
     event::{ClipboardMetadata, Event},
@@ -504,37 +505,29 @@ impl Window {
     #[inline]
     pub fn request_clipboard_content(
         &self,
-        mime: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
-        x11_or_wayland!(match self; Window(w) => w.request_clipboard_content(mime, metadata))
+        x11_or_wayland!(match self; Window(w) => w.request_clipboard_content(serial, mime_picker))
     }
 
     #[inline]
-    pub fn set_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    ) {
-        x11_or_wayland!(match self; Window(w) => w.set_clipboard_content(content, mimes))
+    pub fn set_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
+        x11_or_wayland!(match self; Window(w) => w.set_clipboard_content(serial, content))
     }
 
     #[inline]
     pub fn request_primary_clipboard_content(
         &self,
-        mimes: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
-        x11_or_wayland!(match self; Window(w) => w.request_primary_clipboard_content(mimes, metadata))
+        x11_or_wayland!(match self; Window(w) => w.request_primary_clipboard_content(serial, mime_picker))
     }
 
     #[inline]
-    pub fn set_primary_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    ) {
-        x11_or_wayland!(match self; Window(w) => w.set_primary_clipboard_content(content, mimes))
+    pub fn set_primary_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
+        x11_or_wayland!(match self; Window(w) => w.set_primary_clipboard_content(serial, content))
     }
 
     #[inline]

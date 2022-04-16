@@ -151,11 +151,12 @@ extern crate objc;
 pub mod dpi;
 #[macro_use]
 pub mod error;
+pub mod clipboard;
 pub mod event;
 pub mod event_loop;
-mod icon;
 pub mod monitor;
-mod platform_impl;
+pub mod platform;
 pub mod window;
 
-pub mod platform;
+mod icon;
+mod platform_impl;

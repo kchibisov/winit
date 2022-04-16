@@ -12,7 +12,7 @@ use std::os::raw;
 use std::{ptr, sync::Arc};
 
 use crate::{
-    event::ClipboardMetadata,
+    clipboard::{ClipboardMimedContent, MimeType},
     event_loop::{EventLoopBuilder, EventLoopWindowTarget},
     monitor::MonitorHandle,
     window::{Window, WindowBuilder},
@@ -136,17 +136,15 @@ impl<T> EventLoopBuilderExtUnix for EventLoopBuilder<T> {
 
 /// Additional methods on `Window` that are specific to Unix.
 pub trait WindowExtUnix {
+    /// TODO
     fn request_primary_clipboard_content(
         &self,
-        mimes: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     );
 
-    fn set_primary_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    );
+    /// TODO
+    fn set_primary_clipboard_content(&self, serial: u64, content: ClipboardMimedContent);
 
     /// Returns the ID of the `Window` xlib object that is used by this window.
     ///
@@ -212,21 +210,17 @@ impl WindowExtUnix for Window {
     /// [`crate::event::WindowEvent::ClipboardContent`] with the given `metadata`.
     fn request_primary_clipboard_content(
         &self,
-        mimes: HashSet<String>,
-        metadata: Option<std::sync::Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: Arc<dyn FnOnce(&[MimeType]) -> MimeType>,
     ) {
         self.window
-            .request_primary_clipboard_content(mimes, metadata);
+            .request_primary_clipboard_content(serial, mime_picker);
     }
 
     /// Set primary system clipboard content to provided `content` and advertising it with given
     /// `mimes` mime types.
-    fn set_primary_clipboard_content<C: AsRef<[u8]> + 'static>(
-        &self,
-        content: C,
-        mimes: HashSet<String>,
-    ) {
-        self.window.set_primary_clipboard_content(content, mimes);
+    fn set_primary_clipboard_content(&self, serial: u64, content: ClipboardMimedContent) {
+        self.window.set_primary_clipboard_content(serial, content);
     }
 
     #[inline]
