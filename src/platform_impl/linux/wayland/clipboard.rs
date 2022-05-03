@@ -14,7 +14,9 @@ use sctk::data_device::{DataSourceEvent, ReadPipe, WritePipe};
 use sctk::environment::Environment;
 use sctk::primary_selection::PrimarySelectionSourceEvent;
 
+use crate::clipboard::{ClipboardMimedContent, MimePicker, MimeType};
 use crate::event::{ClipboardContent, ClipboardMetadata, WindowEvent};
+
 use crate::platform_impl::wayland::env::WinitEnv;
 use crate::platform_impl::wayland::event_loop::WinitState;
 use crate::platform_impl::wayland::window::shim::LatestSeat;
@@ -57,29 +59,26 @@ impl ClipboardManager {
     }
 
     /// Set `ty` clipboard content to `content` and offering it with `mimes` mime types.
-    pub fn set_content(
-        &self,
-        ty: ClipboardType,
-        content: Rc<dyn AsRef<[u8]>>,
-        mimes: HashSet<String>,
-    ) {
+    pub fn set_content(&self, ty: ClipboardType, serial: u64, content: ClipboardMimedContent) {
         let seat = match self.seat.as_ref() {
             Some(seat) => seat,
             None => return,
         };
 
-        let mimes = mimes.into_iter().collect();
+        // TODO get textual representation of mime type for particular platform...
+        // Would need something like PlatformMimeType. Will also need methods to convert to and
+        // from them.
         match ty {
-            ClipboardType::Clipboard => self.set_clipboard_content(seat, content, mimes),
-            ClipboardType::Primary => self.set_primary_content(seat, content, mimes),
+            ClipboardType::Clipboard => self.set_clipboard_content(seat, serial, content, mime),
+            ClipboardType::Primary => self.set_primary_content(seat, serial, content, mime),
         }
     }
 
     fn set_clipboard_content(
         &self,
         seat: &LatestSeat,
-        content: Rc<dyn AsRef<[u8]>>,
-        mimes: Vec<String>,
+        serial: u64,
+        content: ClipboardMimedContent,
     ) {
         let loop_handle = self.loop_handle.clone();
         let data_source = self.env.new_data_source(mimes, move |event, _| {
@@ -96,12 +95,7 @@ impl ClipboardManager {
         });
     }
 
-    fn set_primary_content(
-        &self,
-        seat: &LatestSeat,
-        content: Rc<dyn AsRef<[u8]>>,
-        mimes: Vec<String>,
-    ) {
+    fn set_primary_content(&self, seat: &LatestSeat, serial: u64, content: ClipboardMimedContent) {
         let loop_handle = self.loop_handle.clone();
         let primary_source = self
             .env
@@ -125,8 +119,8 @@ impl ClipboardManager {
         &self,
         window_id: WindowId,
         ty: ClipboardType,
-        mimes: HashSet<String>,
-        metadata: Option<Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: MimePicker,
     ) {
         let seat = match self.seat.as_ref() {
             Some(seat) => seat,
@@ -135,10 +129,10 @@ impl ClipboardManager {
 
         match ty {
             ClipboardType::Primary => {
-                self.request_primary_content(seat, window_id, mimes, metadata)
+                self.request_primary_content(seat, window_id, serial, mime_picker)
             }
             ClipboardType::Clipboard => {
-                self.request_clipboard_content(seat, window_id, mimes, metadata)
+                self.request_clipboard_content(seat, window_id, serial, mime_picker)
             }
         }
     }
@@ -147,8 +141,8 @@ impl ClipboardManager {
         &self,
         seat: &LatestSeat,
         window_id: WindowId,
-        mimes: HashSet<String>,
-        metadata: Option<Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: MimePicker,
     ) {
         let loop_handle = self.loop_handle.clone();
         let _ = self.env.with_data_device(&seat.seat, move |device| {
@@ -160,11 +154,7 @@ impl ClipboardManager {
 
                 let mut mime = String::new();
                 offer.with_mime_types(|types| {
-                    for ty in types {
-                        if mimes.contains(ty) {
-                            mime = ty.to_string();
-                        }
-                    }
+                    let v = mime_picker(&[]);
                 });
 
                 let reader = match offer.receive(mime.clone()) {
@@ -181,8 +171,8 @@ impl ClipboardManager {
         &self,
         seat: &LatestSeat,
         window_id: WindowId,
-        mimes: HashSet<String>,
-        metadata: Option<Arc<ClipboardMetadata>>,
+        serial: u64,
+        mime_picker: MimePicker,
     ) {
         let loop_handle = self.loop_handle.clone();
         let _ = self.env.with_primary_selection(&seat.seat, move |device| {
@@ -194,11 +184,8 @@ impl ClipboardManager {
 
                 let mut mime = String::new();
                 offer.with_mime_types(|types| {
-                    for ty in types {
-                        if mimes.contains(ty) {
-                            mime = ty.to_string();
-                        }
-                    }
+                    // TODO
+                    let v = mime_picker(&[]);
                 });
 
                 let reader = match offer.receive(mime.clone()) {

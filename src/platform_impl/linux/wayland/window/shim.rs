@@ -16,9 +16,11 @@ use sctk::reexports::protocols::staging::xdg_activation::v1::client::xdg_activat
 use sctk::environment::Environment;
 use sctk::window::{Decorations, FallbackFrame, Window};
 
+use crate::clipboard::{ClipboardMimedContent, MimePicker, MimeType};
 use crate::dpi::{LogicalPosition, LogicalSize};
-
 use crate::event::{ClipboardMetadata, WindowEvent};
+use crate::window::{CursorIcon, UserAttentionType};
+
 use crate::platform_impl::wayland;
 use crate::platform_impl::wayland::clipboard::{ClipboardManager, ClipboardType};
 use crate::platform_impl::wayland::env::WinitEnv;
@@ -26,7 +28,6 @@ use crate::platform_impl::wayland::event_loop::WinitState;
 use crate::platform_impl::wayland::seat::pointer::WinitPointer;
 use crate::platform_impl::wayland::seat::text_input::TextInputHandler;
 use crate::platform_impl::wayland::WindowId;
-use crate::window::{CursorIcon, UserAttentionType};
 
 /// A request to SCTK window from Winit window.
 #[derive(Clone)]
@@ -79,14 +80,10 @@ pub enum WindowRequest {
     IMEPosition(LogicalPosition<u32>),
 
     /// Set clipboard content.
-    SetClipboardContent(ClipboardType, std::rc::Rc<dyn AsRef<[u8]>>, HashSet<String>),
+    SetClipboardContent(ClipboardType, u64, ClipboardMimedContent),
 
-    /// Requeset clipboard content
-    RequestClipboardContent(
-        ClipboardType,
-        HashSet<String>,
-        Option<std::sync::Arc<ClipboardMetadata>>,
-    ),
+    /// Requeset clipboard content.
+    RequestClipboardContent(ClipboardType, u64, MimePicker),
 
     /// Request Attention.
     ///
@@ -516,10 +513,10 @@ pub fn handle_window_requests(winit_state: &mut WinitState) {
                     window_update.refresh_frame = true;
                 }
                 WindowRequest::SetClipboardContent(ty, content, mimes) => {
-                    window_handle.set_clipboard_content(ty, content, mimes);
+                    // window_handle.set_clipboard_content(ty, content, mimes);
                 }
                 WindowRequest::RequestClipboardContent(ty, mimes, metadata) => {
-                    window_handle.request_clipboard_content(ty, mimes, metadata);
+                    // window_handle.request_clipboard_content(ty, mimes, metadata);
                 }
                 WindowRequest::Attention(request_type) => {
                     window_handle.set_user_attention(request_type);
