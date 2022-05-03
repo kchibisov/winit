@@ -14,7 +14,7 @@ use crate::event::{
     DeviceEvent, ElementState, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent,
 };
 use crate::platform_impl::wayland::event_loop::WinitState;
-use crate::platform_impl::wayland::{self, DeviceId};
+use crate::platform_impl::wayland::{self, seat, DeviceId};
 
 use super::{PointerData, WinitPointer};
 
@@ -66,6 +66,7 @@ pub(super) fn handle_pointer(
                 seat,
             };
             window_handle.pointer_entered(winit_pointer);
+            window_handle.update_latest_serial(serial);
 
             event_sink.push_window_event(
                 WindowEvent::CursorEntered {
@@ -110,6 +111,7 @@ pub(super) fn handle_pointer(
                 seat,
             };
             window_handle.pointer_left(winit_pointer);
+            window_handle.update_latest_serial(serial);
 
             event_sink.push_window_event(
                 WindowEvent::CursorLeft {
@@ -157,6 +159,8 @@ pub(super) fn handle_pointer(
                 Some(window_id) => window_id,
                 None => return,
             };
+
+            seat::update_window_serial!(winit_state, window_id, serial);
 
             let state = match state {
                 wl_pointer::ButtonState::Pressed => ElementState::Pressed,

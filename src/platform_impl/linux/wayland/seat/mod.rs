@@ -29,6 +29,18 @@ use pointer::Pointers;
 use text_input::TextInput;
 use touch::Touch;
 
+/// Helper to update latest serial observed on a particular Window.
+macro_rules! update_window_serial {
+    ($state:ident, $window_id:ident, $serial:ident ) => {
+        match $state.window_map.get_mut(&$window_id) {
+            Some(window_handle) => window_handle.update_latest_serial($serial),
+            None => return,
+        };
+    };
+}
+
+pub(super) use update_window_serial;
+
 pub struct SeatManager {
     /// Listener for seats.
     _seat_listener: SeatListener,

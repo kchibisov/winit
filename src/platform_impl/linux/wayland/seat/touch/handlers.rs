@@ -6,7 +6,7 @@ use crate::dpi::LogicalPosition;
 use crate::event::{TouchPhase, WindowEvent};
 
 use crate::platform_impl::wayland::event_loop::WinitState;
-use crate::platform_impl::wayland::{self, DeviceId};
+use crate::platform_impl::wayland::{self, seat, DeviceId};
 
 use super::{TouchInner, TouchPoint};
 
@@ -21,12 +21,19 @@ pub(super) fn handle_touch(
 
     match event {
         TouchEvent::Down {
-            surface, id, x, y, ..
+            surface,
+            serial,
+            id,
+            x,
+            y,
+            ..
         } => {
             let window_id = wayland::make_wid(&surface);
             if !winit_state.window_map.contains_key(&window_id) {
                 return;
             }
+
+            seat::update_window_serial!(winit_state, window_id, serial);
 
             let scale_factor = sctk::get_surface_scale_factor(&surface) as f64;
             let position = LogicalPosition::new(x, y);
@@ -54,7 +61,7 @@ pub(super) fn handle_touch(
                     .push(TouchPoint::new(surface, position, id));
             }
         }
-        TouchEvent::Up { id, .. } => {
+        TouchEvent::Up { id, serial, .. } => {
             let touch_point = match inner.touch_points.iter().find(|p| p.id == id) {
                 Some(touch_point) => touch_point,
                 None => return,
@@ -63,6 +70,8 @@ pub(super) fn handle_touch(
             let scale_factor = sctk::get_surface_scale_factor(&touch_point.surface) as f64;
             let location = touch_point.position.to_physical(scale_factor);
             let window_id = wayland::make_wid(&touch_point.surface);
+
+            seat::update_window_serial!(winit_state, window_id, serial);
 
             event_sink.push_window_event(
                 WindowEvent::Touch(crate::event::Touch {

@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use sctk::reexports::client::protocol::wl_surface::WlSurface;
@@ -64,6 +64,9 @@ pub struct Window {
 
     /// Whether the window is decorated.
     decorated: AtomicBool,
+
+    /// Latest serial.
+    latest_serial: Arc<AtomicU32>,
 }
 
 impl Window {
@@ -211,6 +214,7 @@ impl Window {
 
         let window_id = super::make_wid(&surface);
         let window_requests = Arc::new(Mutex::new(Vec::with_capacity(64)));
+        let latest_serial = Arc::new(AtomicU32::new(0));
 
         // Create a handle that performs all the requests on underlying sctk a window.
         let window_handle = WindowHandle::new(
@@ -218,6 +222,7 @@ impl Window {
             window,
             size.clone(),
             window_requests.clone(),
+            latest_serial.clone(),
         );
 
         // Set resizable state, so we can determine how to handle `Window::set_inner_size`.
@@ -263,6 +268,7 @@ impl Window {
             windowing_features,
             resizeable: AtomicBool::new(attributes.resizable),
             decorated: AtomicBool::new(attributes.decorations),
+            latest_serial,
         };
 
         Ok(window)
@@ -497,6 +503,20 @@ impl Window {
         let scale_factor = self.scale_factor() as f64;
         let position = position.to_logical(scale_factor);
         self.send_request(WindowRequest::IMEPosition(position));
+    }
+
+    #[inline]
+    pub fn activation_token(&self) -> Option<String> {
+        if !self.windowing_features.xdg_activation() {
+            warn!("window activation isn't supported");
+            return None;
+        }
+
+        let serial = self.latest_serial.load(Ordering::Relaxed);
+
+        // Non zero serial indicated that we've got some events, so we can use it as activation
+        // token.
+        (serial != 0).then(|| serial.to_string())
     }
 
     #[inline]

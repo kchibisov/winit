@@ -87,6 +87,7 @@ impl ApplicationName {
 #[derive(Clone)]
 pub struct PlatformSpecificWindowBuilderAttributes {
     pub name: Option<ApplicationName>,
+    pub activation_token: Option<String>,
     #[cfg(feature = "x11")]
     pub visual_infos: Option<XVisualInfo>,
     #[cfg(feature = "x11")]
@@ -107,6 +108,7 @@ impl Default for PlatformSpecificWindowBuilderAttributes {
     fn default() -> Self {
         Self {
             name: None,
+            activation_token: None,
             #[cfg(feature = "x11")]
             visual_infos: None,
             #[cfg(feature = "x11")]

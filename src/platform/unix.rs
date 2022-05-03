@@ -179,6 +179,9 @@ pub trait WindowExtUnix {
     #[cfg(feature = "wayland")]
     fn wayland_display(&self) -> Option<*mut raw::c_void>;
 
+    /// Get activation token.
+    fn activation_token(&self) -> Option<String>;
+
     /// Check if the window is ready for drawing
     ///
     /// It is a remnant of a previous implementation detail for the
@@ -261,6 +264,15 @@ impl WindowExtUnix for Window {
         }
     }
 
+    fn activation_token(&self) -> Option<String> {
+        match self.window {
+            #[cfg(feature = "wayland")]
+            LinuxWindow::Wayland(ref w) => w.activation_token(),
+            #[cfg(feature = "x11")]
+            LinuxWindow::X(ref w) => w.activation_token(),
+        }
+    }
+
     #[inline]
     fn is_ready(&self) -> bool {
         true
@@ -274,6 +286,9 @@ pub trait WindowBuilderExtUnix {
 
     #[cfg(feature = "x11")]
     fn with_x11_screen(self, screen_id: i32) -> Self;
+
+    /// Window activation token.
+    fn with_activation_token(self, activation_token: impl Into<String>) -> Self;
 
     /// Build window with the given `general` and `instance` names.
     ///
@@ -345,6 +360,12 @@ impl WindowBuilderExtUnix for WindowBuilder {
     #[cfg(feature = "x11")]
     fn with_x11_screen(mut self, screen_id: i32) -> Self {
         self.platform_specific.screen_id = Some(screen_id);
+        self
+    }
+
+    #[inline]
+    fn with_activation_token(mut self, activation_token: impl Into<String>) -> Self {
+        self.platform_specific.activation_token = Some(activation_token.into());
         self
     }
 

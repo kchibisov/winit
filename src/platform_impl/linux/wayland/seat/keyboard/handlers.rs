@@ -6,7 +6,7 @@ use sctk::seat::keyboard::Event as KeyboardEvent;
 
 use crate::event::{ElementState, KeyboardInput, ModifiersState, WindowEvent};
 use crate::platform_impl::wayland::event_loop::WinitState;
-use crate::platform_impl::wayland::{self, DeviceId};
+use crate::platform_impl::wayland::{self, seat, DeviceId};
 
 use super::keymap;
 use super::KeyboardInner;
@@ -19,8 +19,12 @@ pub(super) fn handle_keyboard(
 ) {
     let event_sink = &mut winit_state.event_sink;
     match event {
-        KeyboardEvent::Enter { surface, .. } => {
+        KeyboardEvent::Enter {
+            surface, serial, ..
+        } => {
             let window_id = wayland::make_wid(&surface);
+
+            seat::update_window_serial!(winit_state, window_id, serial);
 
             // Window gained focus.
             event_sink.push_window_event(WindowEvent::Focused(true), window_id);
@@ -55,12 +59,15 @@ pub(super) fn handle_keyboard(
             keysym,
             state,
             utf8,
+            serial,
             ..
         } => {
             let window_id = match inner.target_window_id {
                 Some(window_id) => window_id,
                 None => return,
             };
+
+            seat::update_window_serial!(winit_state, window_id, serial);
 
             let state = match state {
                 KeyState::Pressed => ElementState::Pressed,

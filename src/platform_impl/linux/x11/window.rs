@@ -1235,6 +1235,11 @@ impl UnownedWindow {
     }
 
     #[inline]
+    pub fn activation_token(&self) -> Option<String> {
+        None
+    }
+
+    #[inline]
     pub fn xlib_display(&self) -> *mut c_void {
         self.xconn.display as _
     }

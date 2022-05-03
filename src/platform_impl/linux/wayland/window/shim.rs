@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use sctk::reexports::client::protocol::wl_compositor::WlCompositor;
@@ -177,6 +178,9 @@ pub struct WindowHandle {
 
     /// Compositor
     compositor: Attached<WlCompositor>,
+
+    /// Latest serial observed on the window.
+    latest_serial: Arc<AtomicU32>,
 }
 
 impl WindowHandle {
@@ -185,6 +189,7 @@ impl WindowHandle {
         window: Window<FallbackFrame>,
         size: Arc<Mutex<LogicalSize<u32>>>,
         pending_window_requests: Arc<Mutex<Vec<WindowRequest>>>,
+        latest_serial: Arc<AtomicU32>,
     ) -> Self {
         let xdg_activation = env.get_global::<XdgActivationV1>();
         // Unwrap is safe, since we can't create window without compositor anyway and won't be
@@ -204,6 +209,7 @@ impl WindowHandle {
             xdg_activation,
             attention_requested: Cell::new(false),
             compositor,
+            latest_serial,
         }
     }
 
@@ -295,6 +301,11 @@ impl WindowHandle {
                 pointer.unconfine();
             }
         }
+    }
+
+    #[inline]
+    pub fn update_latest_serial(&self, serial: u32) {
+        let _ = self.latest_serial.swap(serial, Ordering::Relaxed);
     }
 
     pub fn text_input_entered(&mut self, text_input: TextInputHandler) {
