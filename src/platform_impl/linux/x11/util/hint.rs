@@ -248,11 +248,14 @@ impl<'a> NormalHints<'a> {
 
     pub fn set_resize_increments(&mut self, resize_increments: Option<(u32, u32)>) {
         if let Some((width_inc, height_inc)) = resize_increments {
-            self.size_hints.flags |= ffi::PResizeInc;
+            self.size_hints.base_width = 1;
+            self.size_hints.base_height = 1;
+            self.size_hints.flags |= ffi::PResizeInc | ffi::PBaseSize;
             self.size_hints.width_inc = width_inc as c_int;
             self.size_hints.height_inc = height_inc as c_int;
         } else {
             self.size_hints.flags &= !ffi::PResizeInc;
+            self.size_hints.flags &= !ffi::PBaseSize;
         }
     }
 

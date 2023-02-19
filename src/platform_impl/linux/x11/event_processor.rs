@@ -330,6 +330,26 @@ impl<T: 'static> EventProcessor<T> {
                 }
             }
 
+            ffi::PropertyNotify => {
+                eprintln!("Property notified");
+                let xev: &ffi::XPropertyEvent = xev.as_ref();
+                if xev.state != ffi::PropertyNewValue {
+                    return;
+                }
+
+                // Update hints.
+                if xev.atom == unsafe { wt.xconn.get_atom_unchecked(b"_NET_WM_STATE\0") } {
+                    let xwindow = xev.window;
+                    if let Some(window) = self.with_window(xwindow, Arc::clone) {
+                        eprintln!("is_maximized: {}, reloading increments", window.is_maximized());
+                        // Reload resize increments, since we don't want to set them for maximized
+                        // window.
+                        let increments = window.shared_state_lock().resize_increments;
+                        window.set_resize_increments(increments);
+                    }
+                }
+            }
+
             ffi::ConfigureNotify => {
                 let xev: &ffi::XConfigureEvent = xev.as_ref();
                 let xwindow = xev.window;

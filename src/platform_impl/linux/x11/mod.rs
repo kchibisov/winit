@@ -202,6 +202,9 @@ impl<T: 'static> EventLoop<T> {
             ext
         };
 
+        // Select property change.
+        unsafe { (xconn.xlib.XSelectInput)(xconn.display, root, ffi::PropertyChangeMask) };
+
         unsafe {
             let mut xinput_major_ver = ffi::XI_2_Major;
             let mut xinput_minor_ver = ffi::XI_2_Minor;

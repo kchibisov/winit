@@ -395,11 +395,13 @@ impl UnownedWindow {
                 normal_hints.set_size(Some(dimensions));
                 normal_hints.set_min_size(min_inner_size.map(Into::into));
                 normal_hints.set_max_size(max_inner_size.map(Into::into));
-                normal_hints.set_resize_increments(
-                    window_attrs
-                        .resize_increments
-                        .map(|size| size.to_physical::<u32>(scale_factor).into()),
-                );
+                if !window_attrs.maximized {
+                    normal_hints.set_resize_increments(
+                        window_attrs
+                            .resize_increments
+                            .map(|size| size.to_physical::<u32>(scale_factor).into()),
+                    );
+                }
                 normal_hints.set_base_size(
                     pl_attribs
                         .base_size
@@ -1224,10 +1226,14 @@ impl UnownedWindow {
     #[inline]
     pub fn set_resize_increments(&self, increments: Option<Size>) {
         self.shared_state_lock().resize_increments = increments;
-        let physical_increments =
-            increments.map(|increments| increments.to_physical::<u32>(self.scale_factor()).into());
-        self.update_normal_hints(|hints| hints.set_resize_increments(physical_increments))
-            .expect("Failed to call `XSetWMNormalHints`");
+        // Set increments only when the window is not maximized.
+        if !self.is_maximized() {
+            eprintln!("Actually setting the increments!");
+            let physical_increments = increments
+                .map(|increments| increments.to_physical::<u32>(self.scale_factor()).into());
+            self.update_normal_hints(|hints| hints.set_resize_increments(physical_increments))
+                .expect("Failed to call `XSetWMNormalHints`");
+        }
     }
 
     pub(crate) fn adjust_for_dpi(
@@ -1238,17 +1244,20 @@ impl UnownedWindow {
         height: u32,
         shared_state: &SharedState,
     ) -> (u32, u32) {
+        let is_maximized = self.is_maximized();
         let scale_factor = new_scale_factor / old_scale_factor;
         self.update_normal_hints(|normal_hints| {
             let dpi_adjuster =
                 |size: Size| -> (u32, u32) { size.to_physical::<u32>(new_scale_factor).into() };
             let max_size = shared_state.max_inner_size.map(dpi_adjuster);
             let min_size = shared_state.min_inner_size.map(dpi_adjuster);
-            let resize_increments = shared_state.resize_increments.map(dpi_adjuster);
             let base_size = shared_state.base_size.map(dpi_adjuster);
             normal_hints.set_max_size(max_size);
             normal_hints.set_min_size(min_size);
-            normal_hints.set_resize_increments(resize_increments);
+            if !is_maximized {
+                let resize_increments = shared_state.resize_increments.map(dpi_adjuster);
+                normal_hints.set_resize_increments(resize_increments);
+            }
             normal_hints.set_base_size(base_size);
         })
         .expect("Failed to update normal hints");
@@ -1368,6 +1377,7 @@ impl UnownedWindow {
                             | ffi::LeaveWindowMask
                             | ffi::PointerMotionMask
                             | ffi::PointerMotionHintMask
+                            | ffi::PropertyChangeMask
                             | ffi::Button1MotionMask
                             | ffi::Button2MotionMask
                             | ffi::Button3MotionMask
