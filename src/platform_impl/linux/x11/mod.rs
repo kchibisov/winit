@@ -62,7 +62,7 @@ use self::{
 };
 use super::common::xkb_state::KbdState;
 use crate::{
-    error::OsError as RootOsError,
+    error::{OsError as RootOsError},
     event::{Event, StartCause},
     event_loop::{ControlFlow, DeviceEvents, EventLoopClosed, EventLoopWindowTarget as RootELW},
     platform_impl::{
