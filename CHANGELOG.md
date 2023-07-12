@@ -8,6 +8,7 @@ And please only add new entries to the top of this list, right below the `# Unre
 
 # Unreleased
 
+- **Breaking:** `ActivationTokenDone` event which could be requested with the new `startup_notify` module, see its docs for more.
 - **Breaking:** Rename `Window::set_inner_size` to `Window::request_inner_size` and indicate if the size was applied immediately.
 - On X11, fix false positive flagging of key repeats when pressing different keys with no release between presses.
 - Implement `PartialOrd` and `Ord` for `KeyCode` and `NativeKeyCode`.

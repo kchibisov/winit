@@ -17,9 +17,11 @@ use sctk::reexports::client::globals;
 use sctk::reexports::client::{Connection, Proxy, QueueHandle, WaylandSource};
 
 use crate::dpi::{LogicalSize, PhysicalSize};
+
 use crate::event::{Event, StartCause, WindowEvent};
 use crate::event_loop::{ControlFlow, EventLoopWindowTarget as RootEventLoopWindowTarget};
 use crate::platform_impl::platform::sticky_exit_callback;
+
 use crate::platform_impl::EventLoopWindowTarget as PlatformEventLoopWindowTarget;
 
 mod proxy;
@@ -29,6 +31,7 @@ pub use proxy::EventLoopProxy;
 use sink::EventSink;
 
 use super::state::{WindowCompositorUpdate, WinitState};
+
 use super::{DeviceId, WindowId};
 
 type WaylandDispatcher = calloop::Dispatcher<'static, WaylandSource<WinitState>, WinitState>;

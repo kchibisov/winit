@@ -23,6 +23,7 @@ use x11rb::{
 use crate::{
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
     error::{ExternalError, NotSupportedError, OsError as RootOsError},
+    event_loop::AsyncRequestSerial,
     platform_impl::{
         x11::{atoms::*, MonitorHandle as X11MonitorHandle, X11Error},
         Fullscreen, MonitorHandle as PlatformMonitorHandle, OsError,
@@ -1697,6 +1698,11 @@ impl UnownedWindow {
         wm_hints
             .set(self.xconn.xcb_connection(), self.xwindow as xproto::Window)
             .expect_then_ignore_error("Failed to set WM hints");
+    }
+
+    #[inline]
+    pub fn request_activation_token(&self) -> Result<AsyncRequestSerial, NotSupportedError> {
+        Err(NotSupportedError::new())
     }
 
     #[inline]
