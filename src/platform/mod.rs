@@ -33,8 +33,6 @@ pub mod web;
 pub mod windows;
 #[cfg(x11_platform)]
 pub mod x11;
-#[cfg(any(x11_platform, wayland_platform))]
-pub mod startup_notify;
 
 pub mod modifier_supplement;
 #[cfg(any(
