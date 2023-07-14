@@ -797,6 +797,9 @@ pub enum X11Error {
 
     /// Got `null` from an Xlib function without a reason.
     UnexpectedNull(&'static str),
+
+    /// Got an invalid activation token.
+    InvalidActivationToken(Vec<u8>),
 }
 
 impl fmt::Display for X11Error {
@@ -808,6 +811,11 @@ impl fmt::Display for X11Error {
             X11Error::XidsExhausted(e) => write!(f, "XID range exhausted: {}", e),
             X11Error::X11(e) => write!(f, "X11 error: {:?}", e),
             X11Error::UnexpectedNull(s) => write!(f, "Xlib function returned null: {}", s),
+            X11Error::InvalidActivationToken(s) => write!(
+                f,
+                "Invalid activation token: {}",
+                std::str::from_utf8(s).unwrap_or("<invalid utf8>")
+            ),
         }
     }
 }

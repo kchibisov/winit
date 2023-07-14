@@ -1712,7 +1712,7 @@ impl UnownedWindow {
         // Get the activation token and then put it in the event queue.
         let token = self
             .xconn
-            .request_activation_token()
+            .request_activation_token(&self.title())
             .expect("Failed to get activation token");
         let serial = crate::event_loop::AsyncRequestSerial::get();
 

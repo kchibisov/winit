@@ -5,20 +5,20 @@
 //! X11 has a "startup notification" specification similar to Wayland's, see this URL:
 //! https://specifications.freedesktop.org/startup-notification-spec/startup-notification-latest.txt
 
-use super::{atoms::*, X11Error, XConnection};
+use super::{atoms::*, VoidCookie, X11Error, XConnection};
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::ffi::CString;
+use std::fmt::Write;
 
-use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{self, ConnectionExt as _};
 
 impl XConnection {
     /// "Request" a new activation token from the server.
-    pub(crate) fn request_activation_token(&self) -> Result<String, X11Error> {
+    pub(crate) fn request_activation_token(&self, window_title: &str) -> Result<String, X11Error> {
         // The specification recommends the format "hostname+pid+"_TIME"+current time"
         let uname = rustix::system::uname();
         let pid = rustix::process::getpid();
-        let time = self.x11_timestamp()?;
+        let time = self.timestamp();
 
         let activation_token = format!(
             "{}{}_TIME{}",
@@ -26,6 +26,22 @@ impl XConnection {
             pid.as_raw_nonzero(),
             time
         );
+
+        // Set up the new startup notification.
+        let notification = {
+            let mut buffer = Vec::new();
+            buffer.extend_from_slice(b"new: ID=");
+            quote_string(&activation_token, &mut buffer);
+            buffer.extend_from_slice(b" NAME=");
+            quote_string(window_title, &mut buffer);
+            buffer.extend_from_slice(b" SCREEN=");
+            push_display(&mut buffer, &self.default_screen_index());
+
+            CString::new(buffer)
+                .map_err(|err| X11Error::InvalidActivationToken(err.into_vec()))?
+                .into_bytes_with_nul()
+        };
+        self.send_message(&notification)?;
 
         Ok(activation_token)
     }
@@ -55,32 +71,21 @@ impl XConnection {
         let message = {
             const MESSAGE_ROOT: &str = "remove: ID=";
 
-            let mut buffer =
-                String::with_capacity(MESSAGE_ROOT.len().checked_add(startup_id.len()).unwrap());
-
-            buffer.push_str(MESSAGE_ROOT);
-            buffer.push_str(startup_id);
-            buffer.push('\0');
-
-            buffer.into_bytes()
+            let mut buffer = Vec::with_capacity(
+                MESSAGE_ROOT
+                    .len()
+                    .checked_add(startup_id.len())
+                    .and_then(|x| x.checked_add(1))
+                    .unwrap(),
+            );
+            buffer.extend_from_slice(MESSAGE_ROOT.as_bytes());
+            quote_string(startup_id, &mut buffer);
+            CString::new(buffer)
+                .map_err(|err| X11Error::InvalidActivationToken(err.into_vec()))?
+                .into_bytes_with_nul()
         };
 
         self.send_message(&message)
-    }
-
-    /// Get the current X11 timestamp.
-    fn x11_timestamp(&self) -> Result<xproto::Timestamp, X11Error> {
-        // TODO: Figure out if the value returned here actually matters.
-        static SEED: AtomicU32 = AtomicU32::new(0xDEADBEEF);
-        let seed = SEED.load(Ordering::Relaxed);
-
-        // Pseudorandom number generator from the "Xorshift RNGs" paper by George Marsaglia.
-        let mut r = seed;
-        r ^= r << 13;
-        r ^= r >> 17;
-        r ^= r << 5;
-        SEED.store(r, Ordering::Relaxed);
-        Ok(seed)
     }
 
     /// Send a startup notification message to the window manager.
@@ -89,32 +94,23 @@ impl XConnection {
 
         // Create a new window to send the message over.
         let screen = self.default_root();
-        let window = self.xcb_connection().generate_id()?;
-        self.xcb_connection()
-            .create_window(
-                screen.root_depth,
-                screen.root,
-                window,
-                -100,
-                -100,
-                1,
-                1,
-                0,
-                xproto::WindowClass::INPUT_OUTPUT,
-                screen.root_visual,
-                &xproto::CreateWindowAux::new()
-                    .override_redirect(1)
-                    .event_mask(
-                        xproto::EventMask::STRUCTURE_NOTIFY | xproto::EventMask::PROPERTY_CHANGE,
-                    ),
-            )?
-            .ignore_error();
-
-        let _drop_window = CallOnDrop(|| {
-            if let Ok(token) = self.xcb_connection().destroy_window(window) {
-                token.ignore_error();
-            }
-        });
+        let window = xproto::WindowWrapper::create_window(
+            self.xcb_connection(),
+            screen.root_depth,
+            screen.root,
+            -100,
+            -100,
+            1,
+            1,
+            0,
+            xproto::WindowClass::INPUT_OUTPUT,
+            screen.root_visual,
+            &xproto::CreateWindowAux::new()
+                .override_redirect(1)
+                .event_mask(
+                    xproto::EventMask::STRUCTURE_NOTIFY | xproto::EventMask::PROPERTY_CHANGE,
+                ),
+        )?;
 
         // Serialize the messages in 20-byte chunks.
         let mut message_type = atoms[_NET_STARTUP_INFO_BEGIN];
@@ -123,7 +119,8 @@ impl XConnection {
             .map(|chunk| {
                 let mut buffer = [0u8; 20];
                 buffer[..chunk.len()].copy_from_slice(chunk);
-                let event = xproto::ClientMessageEvent::new(8, window, message_type, buffer);
+                let event =
+                    xproto::ClientMessageEvent::new(8, window.window(), message_type, buffer);
 
                 // Set the message type to the continuation atom for the next chunk.
                 message_type = atoms[_NET_STARTUP_INFO];
@@ -139,17 +136,65 @@ impl XConnection {
                         xproto::EventMask::PROPERTY_CHANGE,
                         event,
                     )
-                    .map(|c| c.ignore_error())
+                    .map(VoidCookie::ignore_error)
             })?;
 
         Ok(())
     }
 }
 
-struct CallOnDrop<F: FnMut()>(F);
+/// Quote a literal string as per the startup notification specification.
+fn quote_string(s: &str, target: &mut Vec<u8>) {
+    let total_len = s.len().checked_add(3).expect("overflow");
+    target.reserve(total_len);
 
-impl<F: FnMut()> Drop for CallOnDrop<F> {
-    fn drop(&mut self) {
-        (self.0)();
+    // Add the opening quote.
+    target.push(b'"');
+
+    // Iterate over the string split by literal quotes.
+    s.as_bytes().split(|&b| b == b'"').for_each(|part| {
+        // Add the part.
+        target.extend_from_slice(part);
+
+        // Escape the quote.
+        target.push(b'\\');
+        target.push(b'"');
+    });
+
+    // Un-escape the last quote.
+    target.remove(target.len() - 2);
+}
+
+/// Push a `Display` implementation to the buffer.
+fn push_display(buffer: &mut Vec<u8>, display: &impl std::fmt::Display) {
+    struct Writer<'a> {
+        buffer: &'a mut Vec<u8>,
+    }
+
+    impl<'a> std::fmt::Write for Writer<'a> {
+        fn write_str(&mut self, s: &str) -> std::fmt::Result {
+            self.buffer.extend_from_slice(s.as_bytes());
+            Ok(())
+        }
+    }
+
+    write!(Writer { buffer }, "{}", display).unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn properly_escapes_x11_messages() {
+        let assert_eq = |input: &str, output: &[u8]| {
+            let mut buf = vec![];
+            quote_string(input, &mut buf);
+            assert_eq!(buf, output);
+        };
+
+        assert_eq("", b"\"\"");
+        assert_eq("foo", b"\"foo\"");
+        assert_eq("foo\"bar", b"\"foo\\\"bar\"");
     }
 }
