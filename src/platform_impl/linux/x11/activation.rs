@@ -145,7 +145,7 @@ impl XConnection {
 
 /// Quote a literal string as per the startup notification specification.
 fn quote_string(s: &str, target: &mut Vec<u8>) {
-    let total_len = s.len().checked_add(3).expect("overflow");
+    let total_len = s.len().checked_add(3).expect("quote string overflow");
     target.reserve(total_len);
 
     // Add the opening quote.

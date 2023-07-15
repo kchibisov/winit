@@ -156,7 +156,9 @@ impl XConnection {
         // Store the timestamp in the slot if it's greater than the last one.
         let mut last_timestamp = self.timestamp.load(Ordering::Relaxed);
         loop {
-            if timestamp <= last_timestamp {
+            let wrapping_sub = |a: xproto::Timestamp, b: xproto::Timestamp| (a as i32) - (b as i32);
+
+            if wrapping_sub(timestamp, last_timestamp) <= 0 {
                 break;
             }
 
