@@ -1,0 +1,8 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Winit Startup Notification Example
+Exec=cargo run --example startup_notification
+Terminal=false
+Type=Application
+StartupNotify=true
+

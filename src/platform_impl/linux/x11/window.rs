@@ -1709,10 +1709,21 @@ impl UnownedWindow {
 
     #[inline]
     pub fn request_activation_token(&self) -> Result<AsyncRequestSerial, NotSupportedError> {
+        // Get the title from the WM_NAME property.
+        let atoms = self.xconn.atoms();
+        let title = {
+            let title_bytes = self
+                .xconn
+                .get_property(self.xwindow, atoms[_NET_WM_NAME], atoms[UTF8_STRING])
+                .expect("Failed to get WM_NAME property");
+
+            String::from_utf8(title_bytes).map_err(|_| NotSupportedError::new())?
+        };
+
         // Get the activation token and then put it in the event queue.
         let token = self
             .xconn
-            .request_activation_token(&self.title())
+            .request_activation_token(&title)
             .expect("Failed to get activation token");
         let serial = crate::event_loop::AsyncRequestSerial::get();
 
