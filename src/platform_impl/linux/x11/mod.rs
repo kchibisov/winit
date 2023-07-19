@@ -422,23 +422,19 @@ impl<T: 'static> EventLoop<T> {
             this.drain_events(callback, control_flow);
 
             // Empty activation tokens.
-            {
-                while let Some((token, window_id, serial)) =
-                    this.state.activation_tokens.pop_front()
-                {
-                    sticky_exit_callback(
-                        crate::event::Event::WindowEvent {
-                            window_id: crate::window::WindowId(window_id),
-                            event: crate::event::WindowEvent::ActivationTokenDone {
-                                serial,
-                                token: crate::window::ActivationToken::_new(token),
-                            },
+            while let Some((token, window_id, serial)) = this.state.activation_tokens.pop_front() {
+                sticky_exit_callback(
+                    crate::event::Event::WindowEvent {
+                        window_id: crate::window::WindowId(window_id),
+                        event: crate::event::WindowEvent::ActivationTokenDone {
+                            serial,
+                            token: crate::window::ActivationToken::_new(token),
                         },
-                        &this.target,
-                        control_flow,
-                        callback,
-                    )
-                }
+                    },
+                    &this.target,
+                    control_flow,
+                    callback,
+                )
             }
 
             // Empty the user event buffer
