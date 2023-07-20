@@ -1708,27 +1708,29 @@ impl UnownedWindow {
     }
 
     #[inline]
-    pub fn request_activation_token(&self) -> Result<AsyncRequestSerial, NotSupportedError> {
+    pub(crate) fn generate_activation_token(&self) -> Result<String, X11Error> {
         // Get the title from the WM_NAME property.
         let atoms = self.xconn.atoms();
         let title = {
             let title_bytes = self
                 .xconn
                 .get_property(self.xwindow, atoms[_NET_WM_NAME], atoms[UTF8_STRING])
-                .expect("Failed to get WM_NAME property");
+                .expect("Failed to get title");
 
-            String::from_utf8(title_bytes).map_err(|_| NotSupportedError::new())?
+            String::from_utf8(title_bytes).expect("Bad title")
         };
 
         // Get the activation token and then put it in the event queue.
-        let token = self
-            .xconn
-            .request_activation_token(&title)
-            .expect("Failed to get activation token");
-        let serial = crate::event_loop::AsyncRequestSerial::get();
+        let token = self.xconn.request_activation_token(&title)?;
 
+        Ok(token)
+    }
+
+    #[inline]
+    pub fn request_activation_token(&self) -> Result<AsyncRequestSerial, NotSupportedError> {
+        let serial = AsyncRequestSerial::get();
         self.activation_sender
-            .send((token, self.id(), serial))
+            .send((self.id(), serial))
             .expect("activation token channel should never be closed");
         Ok(serial)
     }

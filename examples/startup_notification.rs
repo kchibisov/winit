@@ -12,9 +12,8 @@ mod fill;
 mod example {
     use std::collections::HashMap;
     use std::rc::Rc;
-    use std::time::{Duration, Instant};
 
-    use winit::event::{ElementState, Event, KeyEvent, StartCause, WindowEvent};
+    use winit::event::{ElementState, Event, KeyEvent, WindowEvent};
     use winit::event_loop::EventLoop;
     use winit::keyboard::Key;
     use winit::platform::startup_notify::{
@@ -35,14 +34,11 @@ mod example {
 
         let mut windows: HashMap<WindowId, Rc<Window>> = HashMap::new();
         let mut counter = 0;
-        let mut window_deadline = Some(Instant::now() + Duration::from_secs(2));
-        let mut last_window_created = Instant::now();
+        let mut create_first_window = false;
 
         event_loop.run(move |event, elwt, flow| {
             match event {
-                Event::NewEvents(StartCause::Init) => {
-                    println!("Waiting one second to make the notification more obvious...");
-                }
+                Event::Resumed => create_first_window = true,
 
                 Event::WindowEvent {
                     window_id,
@@ -57,14 +53,10 @@ mod example {
                             ..
                         },
                 } => {
-                    let diff_time = Instant::now().saturating_duration_since(last_window_created);
-                    if logical_key == Key::Character("n".into())
-                        && diff_time > Duration::from_millis(250)
-                    {
+                    if logical_key == Key::Character("n".into()) {
                         if let Some(window) = windows.get(&window_id) {
                             // Request a new activation token on this window.
                             // Once we get it we will use it to create a window.
-                            last_window_created = Instant::now();
                             window
                                 .request_activation_token()
                                 .expect("Failed to request activation token.");
@@ -88,7 +80,6 @@ mod example {
                     event: WindowEvent::ActivationTokenDone { token, .. },
                     ..
                 } => {
-                    window_deadline = Some(Instant::now() + Duration::from_secs(2));
                     current_token = Some(token);
                 }
 
@@ -102,14 +93,14 @@ mod example {
             }
 
             // See if we've passed the deadline.
-            if window_deadline.map_or(false, |d| d <= Instant::now()) {
+            if current_token.is_some() || create_first_window {
                 // Create the initial window.
                 let window = {
                     let mut builder =
                         WindowBuilder::new().with_title(format!("Window {}", counter));
 
-                    if let Some(current_token) = current_token.take() {
-                        builder = builder.with_activation_token(current_token);
+                    if let Some(token) = current_token.take() {
+                        builder = builder.with_activation_token(token);
                     }
 
                     Rc::new(builder.build(elwt).unwrap())
@@ -119,13 +110,10 @@ mod example {
                 windows.insert(window.id(), window.clone());
 
                 counter += 1;
-                window_deadline = None;
+                create_first_window = false;
             }
 
-            match window_deadline {
-                Some(deadline) => flow.set_wait_until(deadline),
-                None => flow.set_wait(),
-            }
+            flow.set_wait();
         });
     }
 }

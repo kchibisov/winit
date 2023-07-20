@@ -102,7 +102,7 @@ pub struct EventLoop<T: 'static> {
     redraw_dispatcher: Dispatcher<'static, Channel<WindowId>, EventLoopState<T>>,
 }
 
-type ActivationToken = (String, WindowId, crate::event_loop::AsyncRequestSerial);
+type ActivationToken = (WindowId, crate::event_loop::AsyncRequestSerial);
 
 struct EventLoopState<T> {
     /// Incoming user events.
@@ -422,19 +422,31 @@ impl<T: 'static> EventLoop<T> {
             this.drain_events(callback, control_flow);
 
             // Empty activation tokens.
-            while let Some((token, window_id, serial)) = this.state.activation_tokens.pop_front() {
-                sticky_exit_callback(
-                    crate::event::Event::WindowEvent {
-                        window_id: crate::window::WindowId(window_id),
-                        event: crate::event::WindowEvent::ActivationTokenDone {
-                            serial,
-                            token: crate::window::ActivationToken::_new(token),
+            while let Some((window_id, serial)) = this.state.activation_tokens.pop_front() {
+                let token = this
+                    .event_processor
+                    .with_window(window_id.0 as xproto::Window, |window| {
+                        window.generate_activation_token()
+                    });
+
+                match token {
+                    Some(Ok(token)) => sticky_exit_callback(
+                        crate::event::Event::WindowEvent {
+                            window_id: crate::window::WindowId(window_id),
+                            event: crate::event::WindowEvent::ActivationTokenDone {
+                                serial,
+                                token: crate::window::ActivationToken::_new(token),
+                            },
                         },
-                    },
-                    &this.target,
-                    control_flow,
-                    callback,
-                )
+                        &this.target,
+                        control_flow,
+                        callback,
+                    ),
+                    Some(Err(e)) => {
+                        log::error!("Failed to get activation token: {}", e);
+                    }
+                    None => {}
+                }
             }
 
             // Empty the user event buffer

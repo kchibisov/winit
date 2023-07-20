@@ -57,7 +57,7 @@ impl<T: 'static> EventProcessor<T> {
         }
     }
 
-    fn with_window<F, Ret>(&self, window_id: xproto::Window, callback: F) -> Option<Ret>
+    pub(crate) fn with_window<F, Ret>(&self, window_id: xproto::Window, callback: F) -> Option<Ret>
     where
         F: Fn(&Arc<UnownedWindow>) -> Ret,
     {
