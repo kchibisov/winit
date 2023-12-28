@@ -44,10 +44,7 @@ fn main() -> Result<(), impl std::error::Error> {
                         app.window = None;
                     }
                     Event::AboutToWait => window.request_redraw(),
-                    Event::WindowEvent {
-                        event: WindowEvent::RedrawRequested,
-                        ..
-                    }  => {
+                    Event::RedrawRequested(_) => {
                         fill::fill_window(window);
                     }
                     _ => (),

@@ -42,13 +42,11 @@ declare_class!(
         fn draw_rect(&self, rect: CGRect) {
             let mtm = MainThreadMarker::new().unwrap();
             let window = self.window().unwrap();
-            app_state::handle_nonuser_event(
-                mtm,
-                EventWrapper::StaticEvent(Event::WindowEvent {
-                    window_id: RootWindowId(window.id()),
-                    event: WindowEvent::RedrawRequested,
-                }),
-            );
+            unsafe {
+                app_state::handle_nonuser_event(EventWrapper::StaticEvent(Event::RedrawRequested(
+                    RootWindowId(window.id()),
+                )));
+            }
             let _: () = unsafe { msg_send![super(self), drawRect: rect] };
         }
 

@@ -72,13 +72,7 @@ enum UserCallbackTransitionResult<'a> {
 
 impl Event<Never> {
     fn is_redraw(&self) -> bool {
-        matches!(
-            self,
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            }
-        )
+        matches!(self, Event::RedrawRequested(_))
     }
 }
 
@@ -762,12 +756,7 @@ pub fn handle_main_events_cleared(mtm: MainThreadMarker) {
     let redraw_events: Vec<EventWrapper> = this
         .main_events_cleared_transition()
         .into_iter()
-        .map(|window| {
-            EventWrapper::StaticEvent(Event::WindowEvent {
-                window_id: RootWindowId(window.id()),
-                event: WindowEvent::RedrawRequested,
-            })
-        })
+        .map(|window| EventWrapper::StaticEvent(Event::RedrawRequested(RootWindowId(window.id()))))
         .collect();
     drop(this);
 

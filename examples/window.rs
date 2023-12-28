@@ -25,19 +25,18 @@ fn main() -> Result<(), impl std::error::Error> {
         println!("{event:?}");
 
         match event {
-            Event::WindowEvent { event, window_id } if window_id == window.id() => match event {
-                WindowEvent::CloseRequested => control_flow.set_exit(),
-                WindowEvent::RedrawRequested => {
-                    // Notify the windowing system that we'll be presenting to the window.
-                    window.pre_present_notify();
-                    fill::fill_window(&window);
-                }
-                _ => (),
-            },
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id,
+            } if window_id == window.id() => control_flow.set_exit(),
             Event::AboutToWait => {
                 window.request_redraw();
             }
-
+            Event::RedrawRequested(_) => {
+                // Notify the windowing system that we'll be presenting to the window.
+                window.pre_present_notify();
+                fill::fill_window(&window);
+            }
             _ => (),
         }
     })

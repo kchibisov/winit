@@ -34,8 +34,8 @@ fn main() -> Result<(), impl std::error::Error> {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
-        if let Event::WindowEvent { event, .. } = event {
-            match event {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::ModifiersChanged(new) => {
                     modifiers = new.state();
@@ -54,11 +54,12 @@ fn main() -> Result<(), impl std::error::Error> {
                         }
                     }
                 }
-                WindowEvent::RedrawRequested => {
-                    fill::fill_window(&window);
-                }
                 _ => (),
+            },
+            Event::RedrawRequested(_) => {
+                fill::fill_window(&window);
             }
+            _ => (),
         };
     })
 }

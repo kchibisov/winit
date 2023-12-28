@@ -60,7 +60,6 @@ fn main() -> Result<(), impl std::error::Error> {
                     }
                 }
                 WindowEvent::ModifiersChanged(new) => modifiers = new.state(),
-                WindowEvent::RedrawRequested => fill::fill_window(&window),
                 _ => (),
             },
             Event::DeviceEvent { event, .. } => match event {
@@ -71,6 +70,7 @@ fn main() -> Result<(), impl std::error::Error> {
                 },
                 _ => (),
             },
+            Event::RedrawRequested(_) => fill::fill_window(&window),
             _ => (),
         }
     })

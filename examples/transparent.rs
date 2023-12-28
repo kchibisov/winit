@@ -26,14 +26,15 @@ fn main() -> Result<(), impl std::error::Error> {
         control_flow.set_wait();
         println!("{event:?}");
 
-        if let Event::WindowEvent { event, .. } = event {
-            match event {
-                WindowEvent::CloseRequested => control_flow.set_exit(),
-                WindowEvent::RedrawRequested => {
-                    fill::fill_window(&window);
-                }
-                _ => (),
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => control_flow.set_exit(),
+            Event::RedrawRequested(_) => {
+                fill::fill_window(&window);
             }
+            _ => (),
         }
     })
 }

@@ -608,10 +608,7 @@ impl<T: 'static> EventLoop<T> {
                 redraws.pop_front()
             } {
                 event_handler(
-                    event::Event::WindowEvent {
-                        window_id: RootWindowId(window_id),
-                        event: event::WindowEvent::RedrawRequested,
-                    },
+                    event::Event::RedrawRequested(RootWindowId(window_id)),
                     &self.window_target,
                     &mut control_flow,
                 );

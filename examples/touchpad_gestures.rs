@@ -42,11 +42,10 @@ fn main() -> Result<(), impl std::error::Error> {
                         println!("Rotated clockwise {delta}");
                     }
                 }
-                WindowEvent::RedrawRequested => {
-                    fill::fill_window(&window);
-                }
                 _ => (),
             }
+        } else if let Event::RedrawRequested(_) = event {
+            fill::fill_window(&window);
         }
     })
 }
