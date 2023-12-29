@@ -168,15 +168,18 @@ impl UnownedWindow {
         #[cfg(not(feature = "rwh_06"))]
         let root = event_loop.root;
 
-        let mut monitors = leap!(xconn.available_monitors());
         let t1 = std::time::Instant::now();
+        let mut monitors = leap!(xconn.available_monitors());
+        eprintln!("Time to list availabe monitors: {:?}", t1.elapsed());
         let guessed_monitor = if monitors.is_empty() {
             X11MonitorHandle::dummy()
         } else {
+            let t1 = std::time::Instant::now();
             xconn
                 .query_pointer(root, util::VIRTUAL_CORE_POINTER)
                 .ok()
                 .and_then(|pointer_state| {
+                    eprintln!("Time to query pointer: {:?}", t1.elapsed());
                     let (x, y) = (pointer_state.root_x as i64, pointer_state.root_y as i64);
 
                     for i in 0..monitors.len() {
@@ -189,7 +192,6 @@ impl UnownedWindow {
                 })
                 .unwrap_or_else(|| monitors.swap_remove(0))
         };
-        eprintln!("Time to guess random monitor thing: {:?}", t1.elapsed());
         let scale_factor = guessed_monitor.scale_factor();
 
         info!("Guessed window scale factor: {}", scale_factor);

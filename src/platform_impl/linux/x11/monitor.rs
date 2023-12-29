@@ -234,30 +234,39 @@ impl XConnection {
 
     fn query_monitor_list(&self) -> Result<Vec<MonitorHandle>, X11Error> {
         let root = self.default_root();
+        let t1 = std::time::Instant::now();
         let resources = ScreenResources::from_connection(self.xcb_connection(), root)?;
+        eprintln!("Screen resource  {:?}", t1.elapsed());
 
         // Pipeline all of the get-crtc requests.
         let mut crtc_cookies = Vec::with_capacity(resources.crtcs().len());
+        let t1 = std::time::Instant::now();
         for &crtc in resources.crtcs() {
             crtc_cookies.push(
                 self.xcb_connection()
                     .randr_get_crtc_info(crtc, x11rb::CURRENT_TIME)?,
             );
         }
+        eprintln!("Randr CTRC info  {:?}", t1.elapsed());
 
         // Do this here so we do all of our requests in one shot.
+        let t1 = std::time::Instant::now();
         let primary = self
             .xcb_connection()
             .randr_get_output_primary(root.root)?
             .reply()?
             .output;
+        eprintln!("Primary {:?}", t1.elapsed());
 
+        let t1 = std::time::Instant::now();
         let mut crtc_infos = Vec::with_capacity(crtc_cookies.len());
         for cookie in crtc_cookies {
             let reply = cookie.reply()?;
             crtc_infos.push(reply);
         }
+        eprintln!("Cookie {:?}", t1.elapsed());
 
+        let t1 = std::time::Instant::now();
         let mut has_primary = false;
         let mut available_monitors = Vec::with_capacity(resources.crtcs().len());
         for (crtc_id, crtc) in resources.crtcs().iter().zip(crtc_infos.iter()) {
@@ -270,6 +279,7 @@ impl XConnection {
             let monitor = MonitorHandle::new(self, &resources, *crtc_id, crtc, is_primary);
             available_monitors.extend(monitor);
         }
+        eprintln!("Some complex iterator {:?}", t1.elapsed());
 
         // If we don't have a primary monitor, just pick one ourselves!
         if !has_primary {
