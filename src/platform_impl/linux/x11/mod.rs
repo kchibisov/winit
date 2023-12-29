@@ -253,6 +253,15 @@ impl<T: 'static> EventLoop<T> {
             .expect("Failed to query XKB extension")
             .expect("X server missing XKB extension");
 
+        // Try to make keyboard input repeat detectable.
+        unsafe {
+            let mut supported_ptr = ffi::False;
+            (xconn.xlib.XkbSetDetectableAutoRepeat)(xconn.display, ffi::True, &mut supported_ptr);
+            if supported_ptr == ffi::False {
+                warn!("Detectable auto repeart is not supported");
+            }
+        }
+
         // Check for XInput2 support.
         xconn
             .xcb_connection()

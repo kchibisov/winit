@@ -169,6 +169,7 @@ impl UnownedWindow {
         let root = event_loop.root;
 
         let mut monitors = leap!(xconn.available_monitors());
+        let t1 = std::time::Instant::now();
         let guessed_monitor = if monitors.is_empty() {
             X11MonitorHandle::dummy()
         } else {
@@ -188,6 +189,7 @@ impl UnownedWindow {
                 })
                 .unwrap_or_else(|| monitors.swap_remove(0))
         };
+        eprintln!("Time to guess random monitor thing: {:?}", t1.elapsed());
         let scale_factor = guessed_monitor.scale_factor();
 
         info!("Guessed window scale factor: {}", scale_factor);
@@ -514,21 +516,6 @@ impl UnownedWindow {
                     &xproto::ConfigureWindowAux::new().stack_mode(xproto::StackMode::ABOVE)
                 ))
                 .ignore_error();
-            }
-
-            // Attempt to make keyboard input repeat detectable
-            unsafe {
-                let mut supported_ptr = ffi::False;
-                (xconn.xlib.XkbSetDetectableAutoRepeat)(
-                    xconn.display,
-                    ffi::True,
-                    &mut supported_ptr,
-                );
-                if supported_ptr == ffi::False {
-                    return Err(os_error!(OsError::Misc(
-                        "`XkbSetDetectableAutoRepeat` failed"
-                    )));
-                }
             }
 
             // Select XInput2 events
