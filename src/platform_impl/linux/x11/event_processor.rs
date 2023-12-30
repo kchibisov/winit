@@ -1253,6 +1253,7 @@ impl<T: 'static> EventProcessor<T> {
                     let xev = unsafe { &*(xev as *const _ as *const ffi::XkbAnyEvent) };
                     match xev.xkb_type {
                         ffi::XkbNewKeyboardNotify => {
+                            println!("New keyboard");
                             let xev = unsafe {
                                 &*(xev as *const _ as *const ffi::XkbNewKeyboardNotifyEvent)
                             };
@@ -1268,17 +1269,23 @@ impl<T: 'static> EventProcessor<T> {
                             let geometry_changed =
                                 util::has_flag(xev.changed, geometry_changed_flag);
 
+                            let modifiers = dbg!(self.kb_state.mods_state());
                             if xev.device == self.kb_state.core_keyboard_id
                                 && (keycodes_changed || geometry_changed)
                             {
                                 unsafe { self.kb_state.init_with_x11_keymap() };
-                                let modifiers = self.kb_state.mods_state();
-                                self.send_modifiers(modifiers.into(), &mut callback);
+                                self.send_modifiers(dbg!(modifiers.into()), &mut callback);
+                            } else {
+                                println!("Garbage");
                             }
                         }
                         ffi::XkbMapNotify => {
+                            println!("Map notify");
                             unsafe { self.kb_state.init_with_x11_keymap() };
-                            self.send_modifiers(self.kb_state.mods_state().into(), &mut callback);
+                            self.send_modifiers(
+                                dbg!(self.kb_state.mods_state().into()),
+                                &mut callback,
+                            );
                         }
                         ffi::XkbStateNotify => {
                             let xev =
@@ -1299,7 +1306,10 @@ impl<T: 'static> EventProcessor<T> {
                                 xev.locked_group as u32,
                             );
 
-                            self.send_modifiers(self.kb_state.mods_state().into(), &mut callback);
+                            self.send_modifiers(
+                                dbg!(self.kb_state.mods_state().into()),
+                                &mut callback,
+                            );
                         }
                         _ => {}
                     }
@@ -1373,15 +1383,21 @@ impl<T: 'static> EventProcessor<T> {
     /// The event won't be send when the `modifiers` match the previosly `sent` modifiers value.
     fn send_modifiers<F: FnMut(Event<T>)>(&self, modifiers: ModifiersState, callback: &mut F) {
         let window_id = match self.active_window {
-            Some(window) => mkwid(window),
-            None => return,
+            Some(window) => dbg!(mkwid(window)),
+            None => {
+                println!("I'm sending modifiers for unfocused window because I can");
+                return;
+            }
         };
 
         if self.modifiers.replace(modifiers) != modifiers {
+            println!("Sending modifiers {:?}", self.modifiers.get());
             callback(Event::WindowEvent {
                 window_id,
                 event: WindowEvent::ModifiersChanged(self.modifiers.get().into()),
             });
+        } else {
+            println!("Not sending modifires because why not");
         }
     }
 
