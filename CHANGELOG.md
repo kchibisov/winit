@@ -11,6 +11,8 @@ Unreleased` header.
 
 # Unreleased
 
+# 0.29.11
+
 - On X11, don't require XIM to run.
 - On X11, fix xkb state not being updated correctly sometimes leading to wrong input.
 - Fix compatibility with 32-bit platforms without 64-bit atomics.
