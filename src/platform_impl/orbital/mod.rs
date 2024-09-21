@@ -134,6 +134,7 @@ impl fmt::Display for WindowProperties<'_> {
     }
 }
 
+<<<<<<< HEAD
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MonitorHandle;
 
