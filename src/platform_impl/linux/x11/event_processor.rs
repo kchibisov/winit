@@ -169,6 +169,7 @@ impl EventProcessor {
                     if self.xfiltered_modifiers.len() == MAX_MOD_REPLAY_LEN {
                         self.xfiltered_modifiers.pop_back();
                     }
+                    dbg!("Adding with serial", xev.serial);
                     self.xfiltered_modifiers.push_front(xev.serial);
                 }
             }
@@ -949,8 +950,13 @@ impl EventProcessor {
         // NOTE: When the modifier was captured by the XFilterEvents the modifiers for the modifier
         // itself are out of sync due to XkbState being delivered before XKeyEvent, since it's
         // being replayed by the XIM, thus we should replay ourselves.
-        let replay = if let Some(position) =
-            self.xfiltered_modifiers.iter().rev().position(|&s| s == xev.serial)
+        dbg!(&xev);
+        let replay = if let Some(position) = self
+            .xfiltered_modifiers
+            .iter()
+            .rev()
+            .position(|&s| s == xev.serial)
+            .filter(|_| self.xmodmap.is_modifier(xev.keycode as u8))
         {
             // We don't have to replay modifiers pressed before the current event if some events
             // were not forwarded to us, since their state is irrelevant.
