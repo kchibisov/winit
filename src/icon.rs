@@ -7,6 +7,7 @@ use crate::utils::{impl_dyn_casting, AsAny};
 pub(crate) const PIXEL_SIZE: usize = mem::size_of::<Pixel>();
 
 /// An icon used for the window titlebar, taskbar, etc.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Icon(pub(crate) Arc<dyn IconProvider>);
 
