@@ -1,0 +1,26 @@
+[package]
+name = "winit-core"
+version = "0.1.0"
+authors = ["The winit contributors", "Kirill Chibisov <contact@kchibisov.com>"]
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+categories = ["gui"]
+
+[features]
+serde = ["dep:serde", "cursor-icon/serde", "smol_str/serde", "dpi/serde", "bitflags/serde"]
+
+[dependencies]
+bitflags = "2"
+cursor-icon = "1.1.0"
+dpi = { version = "0.1.1", path = "../dpi" }
+rwh_06 = { package = "raw-window-handle", version = "0.6", features = ["std"] }
+smol_str = "0.3"
+serde = { workspace = true, optional = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+web-time = "1"
+
+[build-dependencies]
+cfg_aliases = "0.2.1"
