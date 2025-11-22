@@ -37,7 +37,7 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        println!("{event:?}");
+        // println!("{event:?}");
         match event {
             WindowEvent::CloseRequested => {
                 println!("Close was requested; stopping");

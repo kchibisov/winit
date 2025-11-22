@@ -1,9 +1,18 @@
 use std::cell::RefCell;
+use std::fs;
+use std::io::{BufRead, BufReader, ErrorKind};
+use std::os::fd::RawFd;
+use std::os::unix::io::AsRawFd;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use ahash::AHashMap;
+use calloop::PostAction;
 use sctk::compositor::{CompositorHandler, CompositorState};
+use sctk::data_device_manager::data_device::DataDeviceHandler;
+use sctk::data_device_manager::data_offer::{DataOfferHandler, DragOffer};
+use sctk::data_device_manager::data_source::DataSourceHandler;
+use sctk::data_device_manager::{DataDeviceManagerState, WritePipe};
 use sctk::output::{OutputHandler, OutputState};
 use sctk::reexports::calloop::LoopHandle;
 use sctk::reexports::client::backend::ObjectId;
@@ -20,6 +29,10 @@ use sctk::shell::xdg::window::{Window, WindowConfigure, WindowHandler};
 use sctk::shm::slot::SlotPool;
 use sctk::shm::{Shm, ShmHandler};
 use sctk::subcompositor::SubcompositorState;
+use tracing::warn;
+use wayland_client::protocol::wl_data_device::WlDataDevice;
+use wayland_client::protocol::wl_data_device_manager::DndAction;
+use wayland_client::protocol::wl_data_source::WlDataSource;
 use winit_core::error::OsError;
 
 use crate::WindowId;
@@ -119,6 +132,9 @@ pub struct WinitState {
     /// KWin blur manager.
     pub kwin_blur_manager: Option<KWinBlurManager>,
 
+    /// Data device manager.
+    pub data_device_manager: Option<DataDeviceManagerState>,
+
     /// Loop handle to re-register event sources, such as keyboard repeat.
     pub loop_handle: LoopHandle<'static, Self>,
 
@@ -156,9 +172,17 @@ impl WinitState {
 
         let seat_state = SeatState::new(globals, queue_handle);
 
+        let data_device_manager = DataDeviceManagerState::bind(globals, queue_handle).ok();
+
         let mut seats = AHashMap::default();
         for seat in seat_state.seats() {
-            seats.insert(seat.id(), WinitSeatState::new());
+            let state = if let Some(ddm) = data_device_manager.as_ref() {
+                WinitSeatState::new_with_data_device(ddm.get_data_device(queue_handle, &seat))
+            } else {
+                WinitSeatState::new()
+            };
+
+            seats.insert(seat.id(), state);
         }
 
         let (viewporter_state, fractional_scaling_manager) =
@@ -193,6 +217,8 @@ impl WinitState {
             viewporter_state,
             fractional_scaling_manager,
             kwin_blur_manager: KWinBlurManager::new(globals, queue_handle).ok(),
+
+            data_device_manager: DataDeviceManagerState::bind(globals, queue_handle).ok(),
 
             seats,
             text_input_state: TextInputState::new(globals, queue_handle).ok(),
@@ -445,10 +471,161 @@ impl WindowCompositorUpdate {
     }
 }
 
-sctk::delegate_subcompositor!(WinitState);
+impl DataDeviceHandler for WinitState {
+    fn enter(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        wl_data_device: &WlDataDevice,
+        _: f64,
+        _: f64,
+        _: &WlSurface,
+    ) {
+        let Some(data_device) = self
+            .seats
+            .values()
+            .flat_map(|state| state.data_device.as_ref())
+            .find(|data_device| data_device.inner() == wl_data_device)
+        else {
+            return;
+        };
+
+        let Some(drag_offer) = data_device.data().drag_offer() else { return };
+
+        let mime = drag_offer.with_mime_types(|mime_types| {
+            mime_types.iter().find(|mime| mime.as_str() == "text/uri-list").cloned()
+        });
+
+        let Some(mime) = mime else {
+            drag_offer.accept_mime_type(0, None);
+            return;
+        };
+
+        drag_offer.accept_mime_type(0, Some(mime.clone()));
+        drag_offer.set_actions(DndAction::Copy, DndAction::Copy);
+
+        // 1. Schedule this
+        // 2. Move doesn't really matter, but maybe we should hold it?
+        // 3. Drop is the same.
+
+        // Mark non-blocking
+        let Ok(read_pipe) = drag_offer.receive(mime) else { return };
+        let _ = set_non_blocking(read_pipe.as_raw_fd());
+        let _ = self.loop_handle.insert_source(read_pipe, move |_, file, _state| {
+            let file: &mut fs::File = unsafe { file.get_mut() };
+            let mut reader = BufReader::new(file);
+            let consumed = match reader.fill_buf() {
+                Ok(buf) => {
+                    if buf.is_empty() {
+                        drag_offer.finish();
+                        drag_offer.destroy();
+                        return PostAction::Remove;
+                    } else {
+                        // data.extend_from_slice(buf);
+                        // state.dnd_offers.push((offer, data, Some(token)));
+                    }
+                    dbg!(String::from_utf8_lossy(buf));
+                    buf.len()
+                },
+                Err(e) if matches!(e.kind(), ErrorKind::Interrupted | ErrorKind::WouldBlock) => {
+                    return PostAction::Continue;
+                },
+                Err(e) => {
+                    warn!("Error reading dropped data: {}", e);
+                    drag_offer.finish();
+                    drag_offer.destroy();
+                    return PostAction::Remove;
+                },
+            };
+            reader.consume(consumed);
+            PostAction::Continue
+        });
+    }
+
+    fn leave(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {}
+
+    fn motion(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice, x: f64, y: f64) {
+        println!("DND move: {x}x{y}");
+    }
+
+    fn selection(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {}
+
+    fn drop_performed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataDevice) {
+        println!("Drop perform");
+    }
+}
+
+
+
+fn set_non_blocking(raw_fd: RawFd) -> std::io::Result<()> {
+    let flags = unsafe { libc::fcntl(raw_fd, libc::F_GETFL) };
+
+    if flags < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let result = unsafe { libc::fcntl(raw_fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
+    if result < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    Ok(())
+}
+
+impl DataOfferHandler for WinitState {
+    fn source_actions(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &mut DragOffer,
+        _: DndAction,
+    ) {
+    }
+
+    fn selected_action(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &mut DragOffer,
+        _: DndAction,
+    ) {
+        // TODO?
+    }
+}
+
+// NOTE: we don't support dragging from us, only dropping to us.
+impl DataSourceHandler for WinitState {
+    fn accept_mime(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &WlDataSource,
+        _: Option<String>,
+    ) {
+    }
+    fn send_request(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &WlDataSource,
+        _: String,
+        _: WritePipe,
+    ) {
+    }
+    fn cancelled(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataSource) {}
+
+    fn dnd_dropped(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataSource) {}
+
+    fn dnd_finished(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataSource) {}
+
+    fn action(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlDataSource, _: DndAction) {}
+}
+
 sctk::delegate_compositor!(WinitState);
+sctk::delegate_data_device!(WinitState);
 sctk::delegate_output!(WinitState);
 sctk::delegate_registry!(WinitState);
 sctk::delegate_shm!(WinitState);
+sctk::delegate_subcompositor!(WinitState);
 sctk::delegate_xdg_shell!(WinitState);
 sctk::delegate_xdg_window!(WinitState);

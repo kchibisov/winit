@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use ahash::AHashMap;
+use sctk::data_device_manager::data_device::DataDevice;
 use sctk::reexports::client::backend::ObjectId;
 use sctk::reexports::client::protocol::wl_seat::WlSeat;
 use sctk::reexports::client::protocol::wl_touch::WlTouch;
@@ -68,11 +69,18 @@ pub struct WinitSeatState {
 
     /// Whether we have pending modifiers.
     modifiers_pending: bool,
+
+    /// Data device.
+    pub data_device: Option<DataDevice>,
 }
 
 impl WinitSeatState {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn new_with_data_device(data_device: DataDevice) -> Self {
+        Self { data_device: Some(data_device), ..Default::default() }
     }
 }
 
@@ -95,6 +103,12 @@ impl SeatHandler for WinitState {
                 return;
             },
         };
+
+        if seat_state.data_device.is_none()
+            && let Some(data_device_manager) = self.data_device_manager.as_ref()
+        {
+            seat_state.data_device = Some(data_device_manager.get_data_device(queue_handle, &seat));
+        }
 
         match capability {
             SeatCapability::Touch if seat_state.touch.is_none() => {
@@ -236,10 +250,16 @@ impl SeatHandler for WinitState {
     fn new_seat(
         &mut self,
         _connection: &Connection,
-        _queue_handle: &QueueHandle<Self>,
+        queue_handle: &QueueHandle<Self>,
         seat: WlSeat,
     ) {
-        self.seats.insert(seat.id(), WinitSeatState::new());
+        let state = if let Some(ddm) = self.data_device_manager.as_ref() {
+            let data_device = ddm.get_data_device(queue_handle, &seat);
+            WinitSeatState::new_with_data_device(data_device)
+        } else {
+            WinitSeatState::new()
+        };
+        self.seats.insert(seat.id(), state);
     }
 
     fn remove_seat(
