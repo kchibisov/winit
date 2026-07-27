@@ -10,7 +10,8 @@ use winit::application::ApplicationHandler;
 use winit::data_transfer::{DataTransferId, DataTransferSendBuilder, SendData, TypeHint};
 use winit::event::{ButtonSource, MouseButton, WindowEvent};
 use winit::event_loop::{
-    ActiveEventLoop, AsyncRequestSerial, DndAction, DragIcon, EventLoop, OwnedDisplayHandle,
+    ActiveEventLoop, AsyncRequestSerial, DndAction, DragIcon, EventLoop, EventLoopProvider,
+    OwnedDisplayHandle,
 };
 use winit::icon::{Icon, RgbaIcon};
 use winit::window::{Window, WindowAttributes, WindowId};
